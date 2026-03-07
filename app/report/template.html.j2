@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beam Report &mdash; {{ now }}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});">
+</script>
+<style>
+  :root {
+    --bg: #fafafa; --card: #fff; --border: #e5e7eb;
+    --text: #1f2937; --muted: #6b7280;
+    --accent: #6366f1; --green: #16a34a; --red: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.5; padding: 2rem;
+    max-width: 1100px; margin: 0 auto;
+  }
+  h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: .25rem; }
+  h2 {
+    font-size: 1.25rem; font-weight: 600;
+    margin: 2.5rem 0 1rem;
+    border-bottom: 2px solid var(--border); padding-bottom: .5rem;
+  }
+  .subtitle { color: var(--muted); font-size: .9rem; margin-bottom: 1.5rem; }
+  .grid { display: grid; gap: 1rem; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 768px) { .grid-2, .grid-4 { grid-template-columns: 1fr 1fr; } }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: .75rem; padding: 1.25rem;
+  }
+
+  /* KPI */
+  .kpi { text-align: center; }
+  .kpi .value { font-size: 1.6rem; font-weight: 700; }
+  .kpi .label { font-size: .75rem; color: var(--muted); margin-top: .15rem; }
+  .kpi .sub {
+    font-size: .7rem; margin-top: .3rem; padding: 2px 8px;
+    border-radius: 99px; display: inline-block; font-weight: 600;
+  }
+  .kpi .sub.ok   { background: #dcfce7; color: var(--green); }
+  .kpi .sub.fail { background: #fee2e2; color: var(--red); }
+  .kpi .sub.neutral { background: #f3f4f6; color: var(--muted); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th {
+    text-align: left; font-weight: 600; padding: .6rem .75rem;
+    border-bottom: 2px solid var(--border); white-space: nowrap;
+  }
+  td { padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+  .right { text-align: right; }
+
+  /* Ratio badge */
+  .ratio {
+    cursor: pointer; font-weight: 600; border-radius: .35rem;
+    padding: .2rem .5rem; display: inline-block; min-width: 4rem;
+    text-align: center; transition: opacity .15s;
+  }
+  .ratio:hover { opacity: .75; }
+  .ratio.ok   { background: #dcfce7; color: var(--green); }
+  .ratio.fail { background: #fee2e2; color: var(--red); }
+
+  /* Dialog */
+  dialog {
+    border: 1px solid var(--border); border-radius: .75rem; padding: 0;
+    max-width: 640px; width: 90vw;
+    margin: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.3); }
+  dialog .dlg-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+  }
+  dialog .dlg-header h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+  dialog .dlg-close {
+    background: none; border: none; font-size: 1.25rem;
+    cursor: pointer; color: var(--muted); padding: .25rem;
+  }
+  dialog .dlg-close:hover { color: var(--text); }
+  dialog .dlg-body { padding: 1.25rem; }
+  dialog pre {
+    background: #f9fafb; border: 1px solid var(--border);
+    border-radius: .5rem; padding: 1rem; font-size: .8rem;
+    overflow-x: auto; white-space: pre-wrap; margin: 0;
+  }
+
+  /* Deflection value */
+  .defl-val { font-size: .8rem; color: var(--muted); margin-top: .15rem; }
+
+  .diagram-card img { border-radius: .5rem; width: 100%; height: auto; }
+  footer {
+    margin-top: 3rem; text-align: center; font-size: .75rem;
+    color: var(--muted); border-top: 1px solid var(--border); padding-top: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Beam Analysis Report</h1>
+<p class="subtitle">
+  Generated {{ now }} &middot;
+  L = {{ length }} m &middot;
+  {{ b | int }}&times;{{ h | int }} mm &middot;
+  {{ grade }}
+</p>
+
+{# ── KPI ────────────────────────────────────────────────── #}
+<div class="grid grid-4">
+  <div class="card kpi">
+    <div class="value">{{ "%.2f" | format(m_max) }}</div>
+    <div class="label">M<sub>max</sub> (kN&middot;m)</div>
+    <div class="sub neutral">{{ m_combo }}</div>
+  </div>
+  <div class="card kpi">
+    <div class="value">{{ "%.2f" | format(v_max) }}</div>
+    <div class="label">V<sub>max</sub> (kN)</div>
+    <div class="sub neutral">{{ v_combo }}</div>
+  </div>
+  <div class="card kpi">
+    <div class="value">{{ "%.2f" | format(d_max) }}</div>
+    <div class="label">&delta;<sub>max</sub> (mm)</div>
+    <div class="sub neutral">{{ d_combo }}</div>
+  </div>
+  <div class="card kpi">
+    <div class="value">{{ "%.3f" | format(worst_ratio) }}</div>
+    <div class="label">Worst Ratio</div>
+    <div class="sub {{ 'ok' if all_ok else 'fail' }}">{{ 'ALL PASS' if all_ok else 'FAIL' }}</div>
+  </div>
+</div>
+
+{# ── INPUT ──────────────────────────────────────────────── #}
+<h2>Input</h2>
+<div class="grid grid-2">
+  <div class="card">
+    <table>
+      <tr><th colspan="2">Geometry &amp; Material</th></tr>
+      <tr><td>Span</td><td class="right">{{ length }} m</td></tr>
+      <tr><td>Section</td><td class="right">{{ b | int }} &times; {{ h | int }} mm</td></tr>
+      <tr><td>Area</td><td class="right">{{ "%.1f" | format(A_cm2) }} cm²</td></tr>
+      <tr><td>I<sub>z</sub></td><td class="right">{{ "%.1f" | format(Iz_cm4) }} cm⁴</td></tr>
+      <tr><td>Material</td><td class="right">{{ grade }}</td></tr>
+      <tr><td>Service class</td><td class="right">{{ service_class }}</td></tr>
+      <tr><td>Left support</td><td class="right">{{ support_left }}</td></tr>
+      <tr><td>Right support</td><td class="right">{{ support_right }}</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <table>
+      <tr><th>Type</th><th>Magnitude</th><th>Position</th><th>Case</th></tr>
+      {% for ld in loads %}
+      <tr>
+        <td>{{ ld.type }}</td>
+        <td>{{ ld.magnitude }}</td>
+        <td>{{ ld.position }}</td>
+        <td>{{ ld.case }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+{# ── VERIFICATION TABLES ──────────────────────────────────── #}
+<h2>EC5 Verification</h2>
+<div class="grid grid-2">
+  {# ELU table #}
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>ULS</th>
+          <th>Combination</th>
+          <th class="right">Bending</th>
+          <th class="right">Shear</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in elu_combos %}
+        {% set ci = loop.index0 %}
+        <tr>
+          <td>{{ c.label }}</td>
+          <td>${{ c.latex }}$</td>
+          {% for key in ['bending', 'shear'] %}
+            {% set chk = c[key] %}
+            {% if chk %}
+            <td class="right">
+              <span class="ratio {{ 'ok' if chk.is_ok else 'fail' }}"
+                    onclick="document.getElementById('dlg-elu-{{ ci }}-{{ key[0] }}').showModal()">
+                {{ "%.1f" | format(chk.ratio_pct) }}%
+              </span>
+            </td>
+            {% else %}
+            <td class="right">&mdash;</td>
+            {% endif %}
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ELS table #}
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>SLS</th>
+          <th>Combination</th>
+          <th class="right">Deflection</th>
+          <th class="right">Max (mm)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in els_combos %}
+        {% set chk = c.deflection %}
+        <tr>
+          <td>{{ c.label }}</td>
+          <td>${{ c.latex }}$</td>
+          <td class="right">
+            <span class="ratio {{ 'ok' if chk.is_ok else 'fail' }}"
+                  onclick="document.getElementById('dlg-els-{{ loop.index0 }}-d').showModal()">
+              {{ "%.1f" | format(chk.ratio_pct) }}%
+            </span>
+          </td>
+          <td class="right">
+            <span class="defl-val">{{ "%.2f" | format(chk.defl_mm) }} / {{ "%.2f" | format(chk.limit_mm) }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── DIALOGS ─────────────────────────────────────────────── #}
+{% for c in elu_combos %}
+  {% set ci = loop.index0 %}
+  {% for key, label in [('bending', 'Bending'), ('shear', 'Shear')] %}
+    {% set chk = c[key] %}
+    {% if chk %}
+    <dialog id="dlg-elu-{{ ci }}-{{ key[0] }}">
+      <div class="dlg-header">
+        <h3>{{ label }} &mdash; ${{ c.latex }}$ &mdash; {{ 'OK' if chk.is_ok else 'FAIL' }} ({{ "%.1f" | format(chk.ratio_pct) }}%)</h3>
+        <button class="dlg-close" onclick="this.closest('dialog').close()">&times;</button>
+      </div>
+      <div class="dlg-body"><pre>{{ chk.details }}</pre></div>
+    </dialog>
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+{% for c in els_combos %}
+  {% set chk = c.deflection %}
+  <dialog id="dlg-els-{{ loop.index0 }}-d">
+    <div class="dlg-header">
+      <h3>Deflection &mdash; ${{ c.latex }}$ &mdash; {{ 'OK' if chk.is_ok else 'FAIL' }} ({{ "%.1f" | format(chk.ratio_pct) }}%)</h3>
+      <button class="dlg-close" onclick="this.closest('dialog').close()">&times;</button>
+    </div>
+    <div class="dlg-body"><pre>{{ chk.details }}</pre></div>
+  </dialog>
+{% endfor %}
+
+{# ── DIAGRAMS ────────────────────────────────────────────── #}
+<h2>Internal Forces &amp; Deflection</h2>
+<div class="card diagram-card">
+  <img src="{{ diagrams_img }}">
+</div>
+
+<h2>ELU Envelope</h2>
+<div class="card diagram-card">
+  <img src="{{ envelope_img }}">
+</div>
+
+<footer>Beambo &mdash; 2D Beam Analysis &middot; PyNite + Eurocode 5</footer>
+<script>
+document.querySelectorAll('dialog').forEach(d => {
+  d.addEventListener('click', e => { if (e.target === d) d.close(); });
+  d.addEventListener('open', () => {
+    if (typeof renderMathInElement !== 'undefined') renderMathInElement(d);
+  });
+});
+</script>
+
+</body>
+</html>
