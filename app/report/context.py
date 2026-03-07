@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -49,6 +50,8 @@ def build_context(
         "all_ok": report.all_ok,
         # Verification tables (split by type)
         **_pivot_checks(report),
+        # Chart data (JSON for Plotly)
+        "chart_data_json": _build_chart_data_json(case, results),
     }
 
 
@@ -253,3 +256,58 @@ def _combo_to_latex(expr: str) -> str:
         else:
             latex_terms.append(term)
     return " + ".join(latex_terms)
+
+
+def _build_chart_data_json(case: BeamCase, results: BeamResults) -> str:
+    """Build JSON string with all data needed for Plotly charts."""
+    x = results.x.tolist()
+
+    elu_names = [
+        n for n, t in zip(results.combo_names, results.combo_types) if t == "ELU"
+    ]
+    els_names = [
+        n for n, t in zip(results.combo_names, results.combo_types) if t == "ELS"
+    ]
+
+    def _arr(a: np.ndarray | None) -> list[float]:
+        return a.tolist() if a is not None else []
+
+    elu_series: dict[str, dict[str, list[float]]] = {}
+    for cname in elu_names:
+        elu_series[cname] = {
+            "N": results.N[cname].tolist() if cname in results.N else [],
+            "V": results.V[cname].tolist() if cname in results.V else [],
+            "M": results.M[cname].tolist() if cname in results.M else [],
+        }
+
+    els_series: dict[str, dict[str, list[float]]] = {}
+    for cname in els_names:
+        if cname in results.delta:
+            els_series[cname] = {
+                "delta_mm": (results.delta[cname] * 1000).tolist(),
+            }
+
+    limit_mm = case.length * 1000 / case.combos.wnet_limit_ratio
+    limit_label = f"L/{case.combos.wnet_limit_ratio:.0f}"
+
+    data = {
+        "x": x,
+        "elu": elu_series,
+        "els": els_series,
+        "envelopes": {
+            "N_max": _arr(results.N_max),
+            "N_min": _arr(results.N_min),
+            "V_max": _arr(results.V_max),
+            "V_min": _arr(results.V_min),
+            "M_max": _arr(results.M_max),
+            "M_min": _arr(results.M_min),
+        },
+        "deflection_limit_mm": limit_mm,
+        "deflection_limit_label": limit_label,
+        "title": (
+            f"L={case.length}m, "
+            f"{case.section.b:.0f}\u00d7{case.section.h:.0f}mm, "
+            f"{case.material.grade}"
+        ),
+    }
+    return json.dumps(data)

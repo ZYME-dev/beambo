@@ -9,6 +9,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
   onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});">
 </script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <style>
   :root {
     --bg: #fafafa; --card: #fff; --border: #e5e7eb;
@@ -97,7 +98,26 @@
   /* Deflection value */
   .defl-val { font-size: .8rem; color: var(--muted); margin-top: .15rem; }
 
-  .diagram-card img { border-radius: .5rem; width: 100%; height: auto; }
+  .chart-card { border-radius: .75rem; overflow: hidden; }
+
+  /* Tabs */
+  .tabs-wrapper { margin-top: 2.5rem; }
+  .tabs-wrapper h2 { margin-top: 0; }
+  .tabs {
+    display: flex; gap: 0; position: relative; z-index: 1;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    padding: .6rem 1.25rem; font-size: .85rem; font-weight: 600;
+    border: none; border-bottom: 2px solid transparent;
+    background: none; color: var(--muted);
+    cursor: pointer; transition: color .15s, border-color .15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
   footer {
     margin-top: 3rem; text-align: center; font-size: .75rem;
     color: var(--muted); border-top: 1px solid var(--border); padding-top: 1rem;
@@ -268,25 +288,235 @@
   </dialog>
 {% endfor %}
 
-{# ── DIAGRAMS ────────────────────────────────────────────── #}
-<h2>Internal Forces &amp; Deflection</h2>
-<div class="card diagram-card">
-  <img src="{{ diagrams_img }}">
+{# ── CHARTS (tabbed) ─────────────────────────────────────── #}
+<div class="tabs-wrapper">
+<h2>Diagrams</h2>
+<div class="tabs">
+  <button class="tab-btn active" data-tab="tab-forces">Internal Forces</button>
+  <button class="tab-btn" data-tab="tab-envelope">Envelopes</button>
+  <button class="tab-btn" data-tab="tab-deflection">Deflection</button>
 </div>
-
-<h2>ELU Envelope</h2>
-<div class="card diagram-card">
-  <img src="{{ envelope_img }}">
+<div class="card chart-card" style="border-radius: 0 0 .75rem .75rem; border-top: none;">
+  <div id="tab-forces" class="tab-panel active">
+    <div id="chart-forces" style="width:100%;height:700px;"></div>
+  </div>
+  <div id="tab-envelope" class="tab-panel">
+    <div id="chart-envelope" style="width:100%;height:700px;"></div>
+  </div>
+  <div id="tab-deflection" class="tab-panel">
+    <div id="chart-deflection" style="width:100%;height:400px;"></div>
+  </div>
+</div>
 </div>
 
 <footer>Beambo &mdash; 2D Beam Analysis &middot; PyNite + Eurocode 5</footer>
+
 <script>
+// Dialog close-on-backdrop
 document.querySelectorAll('dialog').forEach(d => {
   d.addEventListener('click', e => { if (e.target === d) d.close(); });
   d.addEventListener('open', () => {
     if (typeof renderMathInElement !== 'undefined') renderMathInElement(d);
   });
 });
+
+// ── Tabs ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const panel = document.getElementById(btn.dataset.tab);
+    panel.classList.add('active');
+    // Plotly needs a resize when the container becomes visible
+    const chart = panel.querySelector('[id^="chart-"]');
+    if (chart) Plotly.Plots.resize(chart);
+  });
+});
+
+// ── Chart data ──
+const D = {{ chart_data_json }};
+const x = D.x;
+
+const COLORS = [
+  '#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6',
+  '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#3b82f6',
+];
+
+const layoutBase = {
+  font: { family: 'Inter, Segoe UI, Helvetica Neue, sans-serif', size: 12 },
+  paper_bgcolor: 'transparent',
+  plot_bgcolor: '#fff',
+  margin: { l: 60, r: 20, t: 40, b: 30 },
+  hovermode: 'x unified',
+  legend: { orientation: 'h', y: -0.05, x: 0.5, xanchor: 'center', font: { size: 10 } },
+  xaxis: { gridcolor: '#e5e7eb', zeroline: true, zerolinecolor: '#999' },
+  yaxis: { gridcolor: '#e5e7eb', zeroline: true, zerolinecolor: '#999' },
+};
+const plotCfg = { responsive: true, displaylogo: false };
+
+// ── Tab 1: Internal Forces (N, V, M) ──
+(function() {
+  const traces = [];
+  const comboNames = Object.keys(D.elu);
+
+  // N traces
+  comboNames.forEach((name, i) => {
+    const s = D.elu[name];
+    if (!s.N || s.N.length === 0) return;
+    traces.push({
+      x: x, y: s.N, name: name, type: 'scatter', mode: 'lines',
+      line: { color: COLORS[i % COLORS.length], width: 1.5 },
+      xaxis: 'x', yaxis: 'y',
+      legendgroup: name, showlegend: true,
+    });
+  });
+  if (D.envelopes.N_max.length) {
+    traces.push({
+      x: x, y: D.envelopes.N_max, name: 'Envelope', type: 'scatter', mode: 'lines',
+      line: { color: 'steelblue', width: 0 }, fill: 'none',
+      xaxis: 'x', yaxis: 'y', showlegend: false,
+    });
+    traces.push({
+      x: x, y: D.envelopes.N_min, type: 'scatter', mode: 'lines',
+      line: { color: 'steelblue', width: 0 }, fill: 'tonexty',
+      fillcolor: 'rgba(70,130,180,0.12)',
+      xaxis: 'x', yaxis: 'y', showlegend: false,
+    });
+  }
+
+  // V traces
+  comboNames.forEach((name, i) => {
+    const s = D.elu[name];
+    if (!s.V || s.V.length === 0) return;
+    traces.push({
+      x: x, y: s.V, name: name, type: 'scatter', mode: 'lines',
+      line: { color: COLORS[i % COLORS.length], width: 1.5 },
+      xaxis: 'x2', yaxis: 'y2',
+      legendgroup: name, showlegend: false,
+    });
+  });
+  if (D.envelopes.V_max.length) {
+    traces.push({
+      x: x, y: D.envelopes.V_max, type: 'scatter', mode: 'lines',
+      line: { width: 0 }, fill: 'none',
+      xaxis: 'x2', yaxis: 'y2', showlegend: false,
+    });
+    traces.push({
+      x: x, y: D.envelopes.V_min, type: 'scatter', mode: 'lines',
+      line: { width: 0 }, fill: 'tonexty',
+      fillcolor: 'rgba(220,60,60,0.12)',
+      xaxis: 'x2', yaxis: 'y2', showlegend: false,
+    });
+  }
+
+  // M traces (inverted y)
+  comboNames.forEach((name, i) => {
+    const s = D.elu[name];
+    if (!s.M || s.M.length === 0) return;
+    traces.push({
+      x: x, y: s.M, name: name, type: 'scatter', mode: 'lines',
+      line: { color: COLORS[i % COLORS.length], width: 1.5 },
+      xaxis: 'x3', yaxis: 'y3',
+      legendgroup: name, showlegend: false,
+    });
+  });
+  if (D.envelopes.M_max.length) {
+    traces.push({
+      x: x, y: D.envelopes.M_max, type: 'scatter', mode: 'lines',
+      line: { width: 0 }, fill: 'none',
+      xaxis: 'x3', yaxis: 'y3', showlegend: false,
+    });
+    traces.push({
+      x: x, y: D.envelopes.M_min, type: 'scatter', mode: 'lines',
+      line: { width: 0 }, fill: 'tonexty',
+      fillcolor: 'rgba(40,160,80,0.12)',
+      xaxis: 'x3', yaxis: 'y3', showlegend: false,
+    });
+  }
+
+  Plotly.newPlot('chart-forces', traces, {
+    ...layoutBase,
+    title: { text: D.title, font: { size: 14, weight: 'bold' } },
+    grid: { rows: 3, columns: 1, subplots: [['xy'],['x2y2'],['x3y3']], roworder: 'top to bottom' },
+    xaxis:  { ...layoutBase.xaxis, matches: 'x3', showticklabels: false },
+    xaxis2: { ...layoutBase.xaxis, matches: 'x3', showticklabels: false },
+    xaxis3: { ...layoutBase.xaxis, title: 'Position along beam (m)' },
+    yaxis:  { ...layoutBase.yaxis, title: 'N (kN)' },
+    yaxis2: { ...layoutBase.yaxis, title: 'V (kN)' },
+    yaxis3: { ...layoutBase.yaxis, title: 'M (kN·m)', autorange: 'reversed' },
+    legend: { ...layoutBase.legend, y: -0.02 },
+    margin: { l: 60, r: 20, t: 50, b: 50 },
+  }, plotCfg);
+})();
+
+// ── Tab 2: ELU Envelopes ──
+(function() {
+  const traces = [];
+  const configs = [
+    { key: 'N', color: 'rgb(70,130,180)', yaxis: 'y', xaxis: 'x' },
+    { key: 'V', color: 'rgb(205,92,92)', yaxis: 'y2', xaxis: 'x2' },
+    { key: 'M', color: 'rgb(46,139,87)', yaxis: 'y3', xaxis: 'x3' },
+  ];
+
+  configs.forEach(c => {
+    const maxArr = D.envelopes[c.key + '_max'];
+    const minArr = D.envelopes[c.key + '_min'];
+    if (!maxArr.length) return;
+    const fill = c.color.replace('rgb', 'rgba').replace(')', ',0.15)');
+    traces.push({
+      x: x, y: maxArr, name: c.key + ' Max', type: 'scatter', mode: 'lines',
+      line: { color: c.color, width: 1.5 },
+      xaxis: c.xaxis, yaxis: c.yaxis,
+    });
+    traces.push({
+      x: x, y: minArr, name: c.key + ' Min', type: 'scatter', mode: 'lines',
+      line: { color: c.color, width: 1.5, dash: 'dash' },
+      fill: 'tonexty', fillcolor: fill,
+      xaxis: c.xaxis, yaxis: c.yaxis,
+    });
+  });
+
+  Plotly.newPlot('chart-envelope', traces, {
+    ...layoutBase,
+    title: { text: 'ELU Envelope', font: { size: 14, weight: 'bold' } },
+    grid: { rows: 3, columns: 1, subplots: [['xy'],['x2y2'],['x3y3']], roworder: 'top to bottom' },
+    xaxis:  { ...layoutBase.xaxis, matches: 'x3', showticklabels: false },
+    xaxis2: { ...layoutBase.xaxis, matches: 'x3', showticklabels: false },
+    xaxis3: { ...layoutBase.xaxis, title: 'Position along beam (m)' },
+    yaxis:  { ...layoutBase.yaxis, title: 'N (kN)' },
+    yaxis2: { ...layoutBase.yaxis, title: 'V (kN)' },
+    yaxis3: { ...layoutBase.yaxis, title: 'M (kN·m)', autorange: 'reversed' },
+    margin: { l: 60, r: 20, t: 50, b: 50 },
+  }, plotCfg);
+})();
+
+// ── Tab 3: Deflection (ELS) ──
+(function() {
+  const traces = [];
+  const elsNames = Object.keys(D.els);
+
+  elsNames.forEach((name, i) => {
+    traces.push({
+      x: x, y: D.els[name].delta_mm, name: name, type: 'scatter', mode: 'lines',
+      line: { color: COLORS[i % COLORS.length], width: 1.5 },
+    });
+  });
+  // Limit line
+  traces.push({
+    x: [x[0], x[x.length-1]], y: [-D.deflection_limit_mm, -D.deflection_limit_mm],
+    name: D.deflection_limit_label, type: 'scatter', mode: 'lines',
+    line: { color: '#dc2626', width: 1.5, dash: 'dash' },
+  });
+
+  Plotly.newPlot('chart-deflection', traces, {
+    ...layoutBase,
+    title: { text: 'Deflection (ELS)', font: { size: 14, weight: 'bold' } },
+    xaxis: { ...layoutBase.xaxis, title: 'Position along beam (m)' },
+    yaxis: { ...layoutBase.yaxis, title: 'δ (mm)' },
+    margin: { l: 60, r: 20, t: 50, b: 50 },
+  }, plotCfg);
+})();
 </script>
 
 </body>
