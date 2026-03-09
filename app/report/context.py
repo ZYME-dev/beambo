@@ -86,6 +86,13 @@ def _load_rows(case: BeamCase) -> list[dict[str, str]]:
     """Build a list of load description dicts for the template."""
     rows: list[dict[str, str]] = []
     L = case.length
+    # Count loads per case type for subscript numbering
+    case_counters: dict[str, int] = {}
+
+    def _next_label(case_value: str) -> str:
+        case_counters[case_value] = case_counters.get(case_value, 0) + 1
+        return f"{case_value}_{{{case_counters[case_value]}}}"
+
     for ul in case.uniform_loads:
         x1 = ul.x1 if ul.x1 is not None else 0.0
         x2 = ul.x2 if ul.x2 is not None else L
@@ -94,7 +101,7 @@ def _load_rows(case: BeamCase) -> list[dict[str, str]]:
                 "type": "Uniform",
                 "magnitude": f"{ul.w:.2f} kN/m",
                 "position": f"{x1:.2f} \u2013 {x2:.2f} m",
-                "case": ul.case.value,
+                "case": _next_label(ul.case.value),
             }
         )
     for pl in case.point_loads:
@@ -103,7 +110,7 @@ def _load_rows(case: BeamCase) -> list[dict[str, str]]:
                 "type": "Point",
                 "magnitude": f"{pl.P:.2f} kN",
                 "position": f"x = {pl.x:.2f} m",
-                "case": pl.case.value,
+                "case": _next_label(pl.case.value),
             }
         )
     for tl in case.trapezoidal_loads:
@@ -114,7 +121,7 @@ def _load_rows(case: BeamCase) -> list[dict[str, str]]:
                 "type": "Trapezoidal",
                 "magnitude": f"{tl.w1:.2f} \u2192 {tl.w2:.2f} kN/m",
                 "position": f"{x1:.2f} \u2013 {x2:.2f} m",
-                "case": tl.case.value,
+                "case": _next_label(tl.case.value),
             }
         )
     return rows

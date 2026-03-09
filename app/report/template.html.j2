@@ -176,13 +176,13 @@
   </div>
   <div class="card">
     <table>
-      <tr><th>Type</th><th>Magnitude</th><th>Position</th><th>Case</th></tr>
+      <tr><th>Case</th><th>Type</th><th>Magnitude</th><th>Position</th></tr>
       {% for ld in loads %}
       <tr>
+        <td>${{ ld.case }}$</td>
         <td>{{ ld.type }}</td>
         <td>{{ ld.magnitude }}</td>
         <td>{{ ld.position }}</td>
-        <td>{{ ld.case }}</td>
       </tr>
       {% endfor %}
     </table>
