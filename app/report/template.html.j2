@@ -29,6 +29,10 @@
     margin: 2.5rem 0 1rem;
     border-bottom: 2px solid var(--border); padding-bottom: .5rem;
   }
+  h3 {
+    font-size: 1.05rem; font-weight: 600;
+    margin: 1.5rem 0 .75rem; color: var(--text);
+  }
   .subtitle { color: var(--muted); font-size: .9rem; margin-bottom: 1.5rem; }
   .grid { display: grid; gap: 1rem; }
   .grid-2 { grid-template-columns: 1fr 1fr; }
@@ -134,7 +138,110 @@
   {{ grade }}
 </p>
 
-{# ── KPI ────────────────────────────────────────────────── #}
+{# ══════════════════════════════════════════════════════════ #}
+{# ── SECTION 1: CASE DEFINITION ────────────────────────── #}
+{# ══════════════════════════════════════════════════════════ #}
+<h2>Case Definition</h2>
+<div class="grid grid-2">
+  {# ── Beam definition ── #}
+  <div class="card">
+    <table>
+      <tr><th colspan="2">Beam</th></tr>
+      <tr><td>Span</td><td class="right">{{ length }} m</td></tr>
+      <tr><td>Left support</td><td class="right">{{ support_left }}</td></tr>
+      <tr><td>Right support</td><td class="right">{{ support_right }}</td></tr>
+    </table>
+    {# SVG beam schema #}
+    <svg viewBox="0 0 400 100" style="width:100%;height:auto;margin-top:.75rem;" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#6b7280" stroke-width="1"/>
+        </pattern>
+      </defs>
+      {# Beam line #}
+      <line x1="60" y1="45" x2="340" y2="45" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/>
+      {# Span dimension #}
+      <line x1="60" y1="28" x2="340" y2="28" stroke="#6b7280" stroke-width="0.8"/>
+      <line x1="60" y1="24" x2="60" y2="32" stroke="#6b7280" stroke-width="0.8"/>
+      <line x1="340" y1="24" x2="340" y2="32" stroke="#6b7280" stroke-width="0.8"/>
+      <text x="200" y="24" text-anchor="middle" font-size="11" fill="#6b7280" font-family="Inter, sans-serif">L = {{ length }} m</text>
+      {# Left support #}
+      {% if support_left == 'fixed' %}
+      <rect x="42" y="30" width="18" height="36" fill="url(#hatch)" stroke="#1f2937" stroke-width="1.5"/>
+      {% elif support_left == 'pinned' %}
+      <polygon points="60,48 48,72 72,72" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="44" y1="76" x2="76" y2="76" stroke="#1f2937" stroke-width="1.5"/>
+      {% elif support_left == 'roller_x' or support_left == 'roller_y' %}
+      <polygon points="60,48 48,68 72,68" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="54" cy="74" r="4" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+      <circle cx="66" cy="74" r="4" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+      <line x1="44" y1="80" x2="76" y2="80" stroke="#1f2937" stroke-width="1.5"/>
+      {% endif %}
+      {# Right support #}
+      {% if support_right == 'fixed' %}
+      <rect x="340" y="30" width="18" height="36" fill="url(#hatch)" stroke="#1f2937" stroke-width="1.5"/>
+      {% elif support_right == 'pinned' %}
+      <polygon points="340,48 328,72 352,72" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="324" y1="76" x2="356" y2="76" stroke="#1f2937" stroke-width="1.5"/>
+      {% elif support_right == 'roller_x' or support_right == 'roller_y' %}
+      <polygon points="340,48 328,68 352,68" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="334" cy="74" r="4" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+      <circle cx="346" cy="74" r="4" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+      <line x1="324" y1="80" x2="356" y2="80" stroke="#1f2937" stroke-width="1.5"/>
+      {% endif %}
+    </svg>
+  </div>
+
+  {# ── Loads ── #}
+  <div class="card">
+    <table>
+      <tr><th>Case</th><th>Type</th><th>Magnitude</th><th>Position</th></tr>
+      {% for ld in loads %}
+      <tr>
+        <td>${{ ld.case }}$</td>
+        <td>{{ ld.type }}</td>
+        <td>{{ ld.magnitude }}</td>
+        <td>{{ ld.position }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  {# ── Cross section ── #}
+  <div class="card">
+    <table>
+      <tr><th colspan="2">Cross Section</th></tr>
+      <tr><td>Width (b)</td><td class="right">{{ b | int }} mm</td></tr>
+      <tr><td>Height (h)</td><td class="right">{{ h | int }} mm</td></tr>
+      <tr><td>Area</td><td class="right">{{ "%.1f" | format(A_cm2) }} cm²</td></tr>
+      <tr><td>I<sub>z</sub></td><td class="right">{{ "%.1f" | format(Iz_cm4) }} cm⁴</td></tr>
+      <tr><td>I<sub>y</sub></td><td class="right">{{ "%.1f" | format(Iy_cm4) }} cm⁴</td></tr>
+      <tr><td>W<sub>el,z</sub></td><td class="right">{{ "%.1f" | format(Wel_z_cm3) }} cm³</td></tr>
+    </table>
+  </div>
+
+  {# ── Material ── #}
+  <div class="card">
+    <table>
+      <tr><th colspan="2">Material (EC5)</th></tr>
+      <tr><td>Grade</td><td class="right">{{ grade }}</td></tr>
+      <tr><td>Service class</td><td class="right">{{ service_class }}</td></tr>
+      <tr><td>$\gamma_M$</td><td class="right">{{ "%.2f" | format(gamma_M) }}</td></tr>
+      <tr><td>$k_{mod}$ (G: {{ load_duration_G }})</td><td class="right">{{ "%.2f" | format(kmod_G) }}</td></tr>
+      <tr><td>$k_{mod}$ (Q: {{ load_duration_Q }})</td><td class="right">{{ "%.2f" | format(kmod_Q) }}</td></tr>
+      <tr><td>$f_{m,k}$</td><td class="right">{{ "%.1f" | format(fmk) }} MPa</td></tr>
+      <tr><td>$f_{v,k}$</td><td class="right">{{ "%.1f" | format(fvk) }} MPa</td></tr>
+      <tr><td>$f_{m,d}$ (Q)</td><td class="right">{{ "%.2f" | format(fmd_Q) }} MPa</td></tr>
+      <tr><td>$f_{v,d}$ (Q)</td><td class="right">{{ "%.2f" | format(fvd_Q) }} MPa</td></tr>
+      <tr><td>$E_{0,mean}$</td><td class="right">{{ "%.0f" | format(E0mean) }} MPa</td></tr>
+    </table>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════ #}
+{# ── SECTION 2: RESULTS ───────────────────────────────── #}
+{# ══════════════════════════════════════════════════════════ #}
+<h2>Results</h2>
 <div class="grid grid-4">
   <div class="card kpi">
     <div class="value">{{ "%.2f" | format(m_max) }}</div>
@@ -158,39 +265,8 @@
   </div>
 </div>
 
-{# ── INPUT ──────────────────────────────────────────────── #}
-<h2>Input</h2>
-<div class="grid grid-2">
-  <div class="card">
-    <table>
-      <tr><th colspan="2">Geometry &amp; Material</th></tr>
-      <tr><td>Span</td><td class="right">{{ length }} m</td></tr>
-      <tr><td>Section</td><td class="right">{{ b | int }} &times; {{ h | int }} mm</td></tr>
-      <tr><td>Area</td><td class="right">{{ "%.1f" | format(A_cm2) }} cm²</td></tr>
-      <tr><td>I<sub>z</sub></td><td class="right">{{ "%.1f" | format(Iz_cm4) }} cm⁴</td></tr>
-      <tr><td>Material</td><td class="right">{{ grade }}</td></tr>
-      <tr><td>Service class</td><td class="right">{{ service_class }}</td></tr>
-      <tr><td>Left support</td><td class="right">{{ support_left }}</td></tr>
-      <tr><td>Right support</td><td class="right">{{ support_right }}</td></tr>
-    </table>
-  </div>
-  <div class="card">
-    <table>
-      <tr><th>Case</th><th>Type</th><th>Magnitude</th><th>Position</th></tr>
-      {% for ld in loads %}
-      <tr>
-        <td>${{ ld.case }}$</td>
-        <td>{{ ld.type }}</td>
-        <td>{{ ld.magnitude }}</td>
-        <td>{{ ld.position }}</td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
-</div>
-
-{# ── VERIFICATION TABLES ──────────────────────────────────── #}
-<h2>EC5 Verification</h2>
+{# ── EC5 Verification ─────────────────────────────────── #}
+<h3>EC5 Verification</h3>
 <div class="grid grid-2">
   {# ELU table #}
   <div class="card" style="overflow-x:auto">
@@ -288,9 +364,9 @@
   </dialog>
 {% endfor %}
 
-{# ── CHARTS (tabbed) ─────────────────────────────────────── #}
+{# ── Diagrams (tabbed) ──────────────────────────────────── #}
 <div class="tabs-wrapper">
-<h2>Diagrams</h2>
+<h3>Diagrams</h3>
 <div class="tabs">
   <button class="tab-btn active" data-tab="tab-forces">Internal Forces</button>
   <button class="tab-btn" data-tab="tab-envelope">Envelopes</button>

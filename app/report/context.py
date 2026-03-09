@@ -7,6 +7,8 @@ import re
 from typing import Any
 
 import numpy as np
+from eurocodepy.ec5 import LoadDuration, ServiceClass
+from eurocodepy.ec5 import TimberClass as ec5_timber_class
 
 from app.models import BeamCase, BeamResults, VerificationReport, VerificationResult
 
@@ -27,16 +29,21 @@ def build_context(
     worst_ratio = max((c.ratio for c in report.checks), default=0.0)
 
     return {
-        # Geometry & material
+        # Beam definition
         "length": case.length,
+        "support_left": case.support_left.value,
+        "support_right": case.support_right.value,
+        # Cross section
         "b": sec.b,
         "h": sec.h,
         "A_cm2": sec.A * 1e4,
         "Iz_cm4": sec.Iz * 1e8,
+        "Iy_cm4": sec.Iy * 1e8,
+        "Wel_z_cm3": sec.Iz / (sec.h_m / 2) * 1e6,
+        # Material & design values
         "grade": str(mat.grade),
         "service_class": mat.service_class,
-        "support_left": case.support_left.value,
-        "support_right": case.support_right.value,
+        **_material_design_values(mat),
         # Loads
         "loads": _load_rows(case),
         # KPI
@@ -80,6 +87,50 @@ def _critical_values(results: BeamResults) -> dict[str, tuple[float, str]]:
             crit["delta_max"] = (d_max, cname)
 
     return crit
+
+
+def _material_design_values(
+    mat: Any,
+) -> dict[str, Any]:
+    """Compute EC5 design values for the material card."""
+    from app.models.materials.timber import TimberMaterial
+
+    assert isinstance(mat, TimberMaterial)
+
+    sc_map = {1: ServiceClass.SC1, 2: ServiceClass.SC2, 3: ServiceClass.SC3}  # pyright: ignore[reportAttributeAccessIssue]
+    ld_map = {
+        "Permanent": LoadDuration.Permanent,  # pyright: ignore[reportAttributeAccessIssue]
+        "LongDuration": LoadDuration.LongDuration,  # pyright: ignore[reportAttributeAccessIssue]
+        "MediumDuration": LoadDuration.MediumDuration,  # pyright: ignore[reportAttributeAccessIssue]
+        "ShortDuration": LoadDuration.ShortDuration,  # pyright: ignore[reportAttributeAccessIssue]
+        "Instantaneous": LoadDuration.Instantaneous,  # pyright: ignore[reportAttributeAccessIssue]
+    }
+
+    timber = ec5_timber_class(mat.grade)
+    sc = sc_map[mat.service_class]
+
+    # Design values for G-only and G+Q
+    timber.design_values(service_class=sc, load_duration=ld_map[mat.load_duration_G])
+    kmod_g = timber.kmod
+    gamma_m = timber.safety
+
+    timber.design_values(service_class=sc, load_duration=ld_map[mat.load_duration_Q])
+    kmod_q = timber.kmod
+    fmd_q = timber.fmd
+    fvd_q = timber.fvd
+
+    return {
+        "load_duration_G": mat.load_duration_G,
+        "load_duration_Q": mat.load_duration_Q,
+        "gamma_M": gamma_m,
+        "kmod_G": kmod_g,
+        "kmod_Q": kmod_q,
+        "fmk": timber.fmk,
+        "fvk": timber.fvk,
+        "fmd_Q": fmd_q,
+        "fvd_Q": fvd_q,
+        "E0mean": timber.E0mean,
+    }
 
 
 def _load_rows(case: BeamCase) -> list[dict[str, str]]:
