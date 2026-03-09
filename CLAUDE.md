@@ -35,6 +35,8 @@ Streamlit app for computing 2D beams using PyNite and pyEurocodes.
   - `formulas/` - Analytical beam formulas (for testing against FEA)
     - `simply_supported.py` - Pinned-roller beam (uniform, point load)
     - `cantilever.py` - Fixed-free beam (uniform, tip, arbitrary point load)
+    - `fixed_fixed.py` - Encastré beam (uniform, point load)
+    - `propped_cantilever.py` - Fixed-roller beam (uniform, point load)
   - `cases/` - Beam case definitions (1 file = 1 case, exports `CASE: BeamCase`)
   - `run_beam.py` - CLI runner: case -> analysis -> verification -> plotting
 - `llm/` - LLM-related modules
